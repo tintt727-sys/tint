@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="my">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ကဗျာစုစည်းချက် — ကဗျာ Website</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f172a;--card:#0b1220;--accent:#f97316;--muted:#94a3b8;--glass: rgba(255,255,255,0.04);color-scheme: dark;}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:'Noto Sans Myanmar', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;background:linear-gradient(180deg,#071022 0%, #071430 100%); color:#e6eef8}
+    .container{max-width:1000px;margin:28px auto;padding:18px}
+    header{display:flex;align-items:center;gap:16px}
+    h1{margin:0;font-size:1.5rem}
+    p.lead{margin:4px 0 18px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr 340px;gap:18px}
+    @media (max-width:880px){.grid{grid-template-columns:1fr} .sidebar{order:2}}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    .search{display:flex;gap:8px;margin-bottom:12px}
+    .search input{flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:inherit}
+    .btn{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#071022;font-weight:600;cursor:pointer}
+    .muted{color:var(--muted);font-size:0.95rem}
+    .poem-list{display:flex;flex-direction:column;gap:12px}
+    .poem{padding:12px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer}
+    .poem h3{margin:0 0 6px}
+    .meta{font-size:0.85rem;color:var(--muted)}
+    .sidebar .form-row{margin-bottom:10px}
+    label{display:block;font-size:0.95rem;margin-bottom:6px}
+    input[type=text], textarea, select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit}
+    textarea{min-height:110px;resize:vertical}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .small{padding:6px 8px;font-size:0.9rem}
+    footer{margin-top:22px;text-align:center;color:var(--muted);font-size:0.9rem}
+    .viewer{white-space:pre-wrap;padding:14px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));min-height:160px}
+    .tag{display:inline-block;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,0.03);font-size:0.85rem;margin-right:6px}
+    .empty{padding:24px;text-align:center;color:var(--muted)}
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>ကဗျာစုစည်းချက် (Server Version)</h1>
+    <p class="lead">Server API နှင့် ပေါင်းပြီး ကဗျာများကို သိမ်း၊ ပြင်၊ ဖျက်၊ Share လုပ်နိုင်သည်။</p>
+  </header>
+
+  <div class="grid">
+    <main>
+      <div class="card">
+        <div class="search">
+          <input id="search" placeholder="ရှာရန် — ကဗျာအမည်၊ စာသား၊ အမျိုးအစား...">
+          <button id="newPoemBtn" class="btn">ကဗျာသစ်</button>
+        </div>
+        <div class="poem-list" id="poemList"></div>
+        <div class="empty" id="emptyMsg">မည်သည့်ကဗျာတောင် မရှိသေးပါ</div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>ကဗျာကြည့်ရှုရန်</h3>
+        <div id="viewer" class="viewer"><span class="muted">ကဗျာတစ်ပုဒ်ရွေးချယ်ပါ...</span></div>
+      </div>
+    </main>
+
+    <aside class="sidebar">
+      <div class="card">
+        <h3>စာရေးရန် / ပြင်ရန်</h3>
+        <div class="form-row"><label>အမည်</label><input id="title" type="text"></div>
+        <div class="form-row"><label>အမျိုးအစား (tag)</label><input id="tags" type="text"></div>
+        <div class="form-row"><label>ကဗျာစာသား</label><textarea id="content"></textarea></div>
+        <div class="actions">
+          <button id="saveBtn" class="btn">သိမ်းရန်</button>
+          <button id="deleteBtn" class="small">ဖျက်</button>
+          <button id="shareBtn" class="small">Share</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const API_URL = 'http://localhost:3000/api/poems';
+let poems = [];
+let editingId = null;
+
+async function fetchPoems() {
+  const res = await fetch(API_URL);
+  poems = await res.json();
+  renderList();
+}
+
+function renderList(filter='') {
+  const poemList = document.getElementById('poemList');
+  const q = filter.toLowerCase();
+  poemList.innerHTML = '';
+  const filtered = poems.filter(p => (p.title+p.content+(p.tags||[]).join('')).toLowerCase().includes(q));
+  if(filtered.length===0) document.getElementById('emptyMsg').style.display='block';
+  else document.getElementById('emptyMsg').style.display='none';
+  filtered.forEach(p=>{
+    const el = document.createElement('div');
+    el.className='poem';
+    el.innerHTML=`<h3>${p.title}</h3><div class='meta'>${(p.tags||[]).join(', ')}</div>`;
+    el.onclick=()=>openPoem(p.id);
+    poemList.appendChild(el);
+  });
+}
+
+async function openPoem(id){
+  const res = await fetch(`${API_URL}/${id}`);
+  const p = await res.json();
+  editingId = p.id;
+  document.getElementById('title').value = p.title;
+  document.getElementById('tags').value = (p.tags||[]).join(' ');
+  document.getElementById('content').value = p.content;
+  document.getElementById('viewer').innerHTML=`<h2>${p.title}</h2><pre>${p.content}</pre>`;
+}
+
+document.getElementById('saveBtn').onclick = async () => {
+  const title = document.getElementById('title').value;
+  const tags = document.getElementById('tags').value.split(/\s+/).filter(Boolean);
+  const content = document.getElementById('content').value;
+  if(!content) return alert('စာသား မရှိပါ');
+  if(editingId){
+    await fetch(`${API_URL}/${editingId}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content,tags})});
+  }else{
+    await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content,tags})});
+  }
+  fetchPoems();
+};
+
+document.getElementById('deleteBtn').onclick = async () => {
+  if(!editingId) return alert('ဖျက်ရန် ကဗျာ ရွေးပါ');
+  await fetch(`${API_URL}/${editingId}`, {method:'DELETE'});
+  editingId=null;
+  fetchPoems();
+};
+
+document.getElementById('shareBtn').onclick = () => {
+  if(!editingId) return alert('Share အတွက် ကဗျာ ရွေးပါ');
+  const p = poems.find(x=>x.id===editingId);
+  const link = `${window.location.origin}/poem.html?id=${p.id}`;
+  navigator.clipboard.writeText(link).then(()=>alert('Link ကို clipboard မှာ copy လုပ်ပြီးပါပြီ'));
+};
+
+document.getElementById('newPoemBtn').onclick=()=>{
+  editingId=null;
+  document.getElementById('title').value='';
+  document.getElementById('tags').value='';
+  document.getElementById('content').value='';
+  document.getElementById('viewer').innerHTML='<span class="muted">ကဗျာတစ်ပုဒ်ရွေးချယ်ပါ...</span>';
+};
+
+document.getElementById('search').oninput=(e)=>renderList(e.target.value);
+
+fetchPoems();
+</script>
+</body>
+</html>
